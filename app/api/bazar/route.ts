@@ -35,18 +35,21 @@ export async function POST(req: NextRequest) {
         const room = await Room.findById(roomId);
         if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 });
 
-        const userId = (session.user as any).id;
-        const member = room.members.find((m: any) => m.userId.toString() === userId);
-        if (!member) return NextResponse.json({ error: 'Not a room member' }, { status: 403 });
+        const sessionUserId = (session.user as any).id;
+        const isAdmin = room.adminId.toString() === sessionUserId || room.subAdminId?.toString() === sessionUserId;
 
         // Permission check
         const perm = room.editPermission;
-        const isAdmin = room.adminId.toString() === userId || room.subAdminId?.toString() === userId;
         if (perm === 'admin' && !isAdmin)
             return NextResponse.json({ error: 'Only admin can add entries' }, { status: 403 });
 
+        // Use targetUserId from body if admin is editing for someone else, else own ID
+        const targetUserId = isAdmin && body.userId ? body.userId : sessionUserId;
+        const member = room.members.find((m: any) => m.userId.toString() === targetUserId);
+        if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+
         const entry = await Bazar.findOneAndUpdate(
-            { roomId, userId, date: Number(date), month: Number(month), year: Number(year) },
+            { roomId, userId: targetUserId, date: Number(date), month: Number(month), year: Number(year) },
             { $set: { amount: Number(amount), userName: member.name, note: note || '' } },
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
