@@ -43,8 +43,9 @@ export async function POST(req: NextRequest) {
         if (perm === 'admin' && !isAdmin)
             return NextResponse.json({ error: 'Only admin can add entries' }, { status: 403 });
 
-        // Use targetUserId from body if admin is editing for someone else, else own ID
-        const targetUserId = isAdmin && body.userId ? body.userId : sessionUserId;
+        // Use targetUserId from body if admin, or if everyone-can-edit is on, else own ID
+        const canTargetOthers = isAdmin || perm === 'all';
+        const targetUserId = canTargetOthers && body.userId ? body.userId : sessionUserId;
         const member = room.members.find((m: any) => m.userId.toString() === targetUserId);
         if (!member) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
 
